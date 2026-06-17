@@ -119,9 +119,9 @@ function Landing() {
               <div className="rounded-xl bg-card p-6 text-left sm:p-8">
                 <div className="grid gap-4 sm:grid-cols-3">
                   {[
-                    { k: "1,248", v: "Question banks generated" },
-                    { k: "6", v: "Bloom's levels covered" },
-                    { k: "12 sec", v: "Average generation time" },
+                    { k: "0", v: "Question banks generated" },
+                    { k: "0", v: "Bloom's levels covered" },
+                    { k: "0 sec", v: "Average generation time" },
                   ].map((s) => (
                     <div key={s.v} className="rounded-xl bg-muted/50 p-4">
                       <p className="text-2xl font-bold text-gradient">{s.k}</p>

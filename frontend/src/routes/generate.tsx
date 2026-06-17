@@ -41,7 +41,7 @@ function GeneratePage() {
   const navigate = useNavigate();
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const [file, setFile] = useState<{ name: string; size: string } | null>(null);
+  const [fileData, setFileData] = useState<{ file: File; name: string; size: string } | null>(null);
   const [dragging, setDragging] = useState(false);
   const [twoMark, setTwoMark] = useState(10);
   const [thirteenMark, setThirteenMark] = useState(5);
@@ -57,7 +57,7 @@ function GeneratePage() {
       toast.error("Please upload a PDF file");
       return;
     }
-    setFile({ name: f.name, size: `${(f.size / 1024 / 1024).toFixed(2)} MB` });
+    setFileData({ file: f, name: f.name, size: `${(f.size / 1024 / 1024).toFixed(2)} MB` });
     toast.success("PDF uploaded successfully");
   };
 
@@ -68,17 +68,44 @@ function GeneratePage() {
     if (f) acceptFile(f);
   };
 
-  const generate = () => {
-    if (!file) {
+  const generate = async () => {
+    if (!fileData) {
       toast.error("Upload a PDF before generating");
       return;
     }
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
+    
+    try {
+      const formData = new FormData();
+      formData.append('pdf', fileData.file);
+      formData.append('twoMark', String(twoMark));
+      formData.append('thirteenMark', String(thirteenMark));
+      formData.append('sixteenMark', String(sixteenMark));
+      formData.append('difficulty', difficulty);
+      formData.append('withAnswers', String(withAnswers));
+
+      const response = await fetch('http://localhost:5000/api/questions/generate', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate questions');
+      }
+
+      const data = await response.json();
+      
+      // Save to sessionStorage to access on the results page
+      sessionStorage.setItem('generatedQuestions', JSON.stringify(data.questions));
+
       toast.success("Question bank generated!");
       navigate({ to: "/results" });
-    }, 2200);
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to generate questions. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const difficulties: Difficulty[] = ["Easy", "Medium", "Hard"];
@@ -98,7 +125,7 @@ function GeneratePage() {
               <h3 className="font-semibold">Upload PDF</h3>
             </div>
 
-            {!file ? (
+            {!fileData ? (
               <button
                 type="button"
                 onClick={() => inputRef.current?.click()}
@@ -129,15 +156,15 @@ function GeneratePage() {
                   <FileText className="h-6 w-6" />
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium">{file.name}</p>
+                  <p className="truncate font-medium">{fileData.name}</p>
                   <p className="flex items-center gap-1.5 text-sm text-success">
-                    <CheckCircle2 className="h-3.5 w-3.5" /> Uploaded · {file.size}
+                    <CheckCircle2 className="h-3.5 w-3.5" /> Uploaded · {fileData.size}
                   </p>
                 </div>
                 <Button
                   variant="ghost"
                   size="icon"
-                  onClick={() => setFile(null)}
+                  onClick={() => setFileData(null)}
                   aria-label="Remove file"
                   className="text-muted-foreground"
                 >

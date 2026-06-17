@@ -45,7 +45,7 @@ const statusStyles: Record<HistoryEntry["status"], string> = {
 
 function HistoryPage() {
   const navigate = useNavigate();
-  const [rows, setRows] = useState(sampleHistory);
+  const [rows, setRows] = useState<HistoryEntry[]>([]);
   const [pending, setPending] = useState<HistoryEntry | null>(null);
 
   const confirmDelete = () => {

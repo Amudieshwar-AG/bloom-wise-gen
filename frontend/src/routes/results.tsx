@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import {
   Search,
@@ -15,7 +15,7 @@ import { QuestionCard } from "@/components/app/question-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LoadingSpinner } from "@/components/loading-spinner";
-import { sampleQuestions } from "@/lib/sample-data";
+import { sampleQuestions, type Question } from "@/lib/sample-data";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/results")({
@@ -36,9 +36,21 @@ function Results() {
   const [query, setQuery] = useState("");
   const [regenerating, setRegenerating] = useState(false);
   const [copiedAll, setCopiedAll] = useState(false);
+  const [questions, setQuestions] = useState<Question[]>([]);
+
+  useEffect(() => {
+    const stored = sessionStorage.getItem('generatedQuestions');
+    if (stored) {
+      try {
+        setQuestions(JSON.parse(stored));
+      } catch (e) {
+        console.error("Failed to parse generated questions", e);
+      }
+    }
+  }, []);
 
   const visible = useMemo(() => {
-    return sampleQuestions.filter((q) => {
+    return questions.filter((q) => {
       const markMatch =
         filter === "All" || `${q.marks} Marks` === filter;
       const searchMatch =
@@ -46,7 +58,7 @@ function Results() {
         q.bloom.toLowerCase().includes(query.toLowerCase());
       return markMatch && searchMatch;
     });
-  }, [filter, query]);
+  }, [filter, query, questions]);
 
   const regenerate = () => {
     setRegenerating(true);

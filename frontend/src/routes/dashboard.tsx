@@ -24,12 +24,10 @@ import { AppShell } from "@/components/app/app-shell";
 import { StatCard } from "@/components/app/stat-card";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import {
-  bloomDistribution,
-  questionDistribution,
-  sampleHistory,
-  usageTrend,
-} from "@/lib/sample-data";
+const bloomDistribution: any[] = [];
+const questionDistribution: any[] = [];
+const sampleHistory: any[] = [];
+const usageTrend: any[] = [];
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({
@@ -55,10 +53,10 @@ function Dashboard() {
       }
     >
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="PDFs Uploaded" value="34" icon={FileText} trend={{ value: "12%", up: true }} accent="primary" />
-        <StatCard label="Question Banks Generated" value="58" icon={Layers} trend={{ value: "18%", up: true }} accent="purple" />
-        <StatCard label="Exports Downloaded" value="126" icon={Download} trend={{ value: "9%", up: true }} accent="cyan" />
-        <StatCard label="AI Usage (tokens)" value="2.4M" icon={Activity} trend={{ value: "3%", up: false }} accent="success" />
+        <StatCard label="PDFs Uploaded" value="0" icon={FileText} trend={{ value: "0%", up: true }} accent="primary" />
+        <StatCard label="Question Banks Generated" value="0" icon={Layers} trend={{ value: "0%", up: true }} accent="purple" />
+        <StatCard label="Exports Downloaded" value="0" icon={Download} trend={{ value: "0%", up: true }} accent="cyan" />
+        <StatCard label="AI Usage (tokens)" value="0" icon={Activity} trend={{ value: "0%", up: true }} accent="success" />
       </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-3">
