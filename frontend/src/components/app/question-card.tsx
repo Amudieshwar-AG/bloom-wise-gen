@@ -6,9 +6,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { bloomColors, type Question } from "@/lib/sample-data";
 import { cn } from "@/lib/utils";
+import ReactMarkdown from 'react-markdown';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import 'katex/dist/katex.min.css';
 
 export function QuestionCard({ question }: { question: Question }) {
   const [copied, setCopied] = useState(false);
+  const [showAnswer, setShowAnswer] = useState(false);
 
   const copy = async () => {
     try {
@@ -53,7 +58,34 @@ export function QuestionCard({ question }: { question: Question }) {
           {copied ? <Check className="h-4 w-4 text-success" /> : <Copy className="h-4 w-4" />}
         </Button>
       </div>
-      <p className="mt-3 text-[15px] leading-relaxed text-card-foreground">{question.text}</p>
+      <div className="mt-3 text-[15px] leading-relaxed text-card-foreground [&>p]:mb-2 last:[&>p]:mb-0">
+        <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
+          {question.text}
+        </ReactMarkdown>
+      </div>
+      {question.modelAnswer && (
+        <div className="mt-4">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => setShowAnswer(!showAnswer)}
+            className="text-xs text-muted-foreground mb-3"
+          >
+            {showAnswer ? "Hide Answer" : "View Answer"}
+          </Button>
+          
+          {showAnswer && (
+            <div className="rounded-xl bg-muted/50 p-4 text-sm text-muted-foreground border border-border/50">
+              <p className="font-semibold text-foreground/80 mb-1">Answer:</p>
+              <div className="leading-relaxed [&>p]:mb-2 last:[&>p]:mb-0">
+                <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
+                  {question.modelAnswer}
+                </ReactMarkdown>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </Card>
   );
 }

@@ -7,6 +7,10 @@ import {
   X,
   Sparkles,
   Wand2,
+  Minus,
+  Plus,
+  ChevronUp,
+  ChevronDown,
 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app/app-shell";
@@ -80,7 +84,9 @@ function GeneratePage() {
       formData.append('pdf', fileData.file);
       formData.append('twoMark', String(twoMark));
       formData.append('thirteenMark', String(thirteenMark));
+      formData.append('thirteenPattern', thirteenPattern);
       formData.append('sixteenMark', String(sixteenMark));
+      formData.append('sixteenPattern', sixteenPattern);
       formData.append('difficulty', difficulty);
       formData.append('withAnswers', String(withAnswers));
 
@@ -194,26 +200,22 @@ function GeneratePage() {
             <div className="space-y-6">
               <div className="grid gap-2">
                 <Label htmlFor="two">2-Mark Questions</Label>
-                <Input
+                <NumberInput
                   id="two"
-                  type="number"
                   min={0}
                   value={twoMark}
-                  onChange={(e) => setTwoMark(Number(e.target.value))}
-                  className="rounded-xl"
+                  onChange={(v) => setTwoMark(v)}
                 />
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="grid gap-2">
                   <Label htmlFor="thirteen">13-Mark Questions</Label>
-                  <Input
+                  <NumberInput
                     id="thirteen"
-                    type="number"
                     min={0}
                     value={thirteenMark}
-                    onChange={(e) => setThirteenMark(Number(e.target.value))}
-                    className="rounded-xl"
+                    onChange={(v) => setThirteenMark(v)}
                   />
                 </div>
                 <div className="grid gap-2">
@@ -234,13 +236,11 @@ function GeneratePage() {
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="grid gap-2">
                   <Label htmlFor="sixteen">16-Mark Questions</Label>
-                  <Input
+                  <NumberInput
                     id="sixteen"
-                    type="number"
                     min={0}
                     value={sixteenMark}
-                    onChange={(e) => setSixteenMark(Number(e.target.value))}
-                    className="rounded-xl"
+                    onChange={(v) => setSixteenMark(v)}
                   />
                 </div>
                 <div className="grid gap-2">
@@ -354,4 +354,36 @@ function labelFor(p: string) {
     "10+6": "10 + 6",
   };
   return map[p] ?? p;
+}
+
+function NumberInput({ id, value, onChange, min = 0 }: { id?: string; value: number; onChange: (v: number) => void; min?: number }) {
+  return (
+    <div className="relative flex items-center w-full rounded-xl border border-input bg-transparent focus-within:ring-1 focus-within:ring-ring transition-shadow overflow-hidden">
+      <input
+        id={id}
+        type="number"
+        min={min}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="flex-1 h-10 bg-transparent px-3 py-2 text-sm outline-none placeholder:text-muted-foreground [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+      />
+      <div className="flex flex-col border-l border-input">
+        <button
+          type="button"
+          className="flex h-5 w-8 items-center justify-center text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors border-b border-input"
+          onClick={() => onChange(value + 1)}
+        >
+          <ChevronUp className="h-3 w-3" />
+        </button>
+        <button
+          type="button"
+          className="flex h-5 w-8 items-center justify-center text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors disabled:opacity-50"
+          onClick={() => onChange(Math.max(min, value - 1))}
+          disabled={value <= min}
+        >
+          <ChevronDown className="h-3 w-3" />
+        </button>
+      </div>
+    </div>
+  );
 }

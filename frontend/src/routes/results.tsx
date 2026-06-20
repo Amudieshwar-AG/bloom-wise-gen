@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import {
   Search,
   FileDown,
@@ -60,18 +60,16 @@ function Results() {
     });
   }, [filter, query, questions]);
 
+  const navigate = useNavigate();
+
   const regenerate = () => {
-    setRegenerating(true);
-    setTimeout(() => {
-      setRegenerating(false);
-      toast.success("Questions regenerated");
-    }, 1800);
+    navigate({ to: "/generate" });
   };
 
   const copyAll = async () => {
     try {
       const text = visible
-        .map((q) => `Q${q.number}. (${q.marks} marks) [${q.bloom}] ${q.text}`)
+        .map((q) => `Q${q.number}. (${q.marks} marks) ${q.text}`)
         .join("\n\n");
       await navigator.clipboard.writeText(text);
       setCopiedAll(true);
