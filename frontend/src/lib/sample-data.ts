@@ -13,6 +13,7 @@ export interface Question {
   bloom: BloomLevel;
   text: string;
   hasAnswer?: boolean;
+  modelAnswer?: string;
 }
 
 export interface HistoryEntry {
