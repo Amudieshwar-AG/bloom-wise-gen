@@ -22,29 +22,50 @@ const generateQuestions = async (req, res) => {
       sixteenPattern: req.body.sixteenPattern || 'single',
       difficulty: req.body.difficulty || 'Medium',
       withAnswers: req.body.withAnswers,
+      questionType: req.body.questionType || 'mixed',
     };
 
     // 1 & 2. Extract and chunk text from the uploaded PDF
     let chunks = [];
-    try {
-      const parsed = await extractTextFromPdf(filePath);
-      chunks = parsed.chunks || [];
-    } catch (parseError) {
-      console.warn('pdf-parse failed to read PDF structure. Proceeding to OCR fallback...', parseError.message);
+    let extractedText = '';
+    
+    // Prioritize Gemini OCR for math, derivation, and algorithm PDF sources to preserve mathematical symbols (e.g. √3) and structured code.
+    const isMathOrTechnical = ['maths', 'derivations', 'algorithms'].includes(config.questionType);
+    
+    if (isMathOrTechnical) {
+      try {
+        console.log('Technical question type focus selected. Attempting high-fidelity Gemini OCR first...');
+        extractedText = await extractTextFromImagePdf(filePath);
+      } catch (ocrError) {
+        console.warn('Gemini OCR failed for technical PDF. Falling back to pdf-parse...', ocrError.message);
+      }
     }
     
-    // Fallback: If pdf-parse couldn't extract text (e.g., scanned/image-based PDF)
-    if (!chunks || chunks.length === 0) {
-      console.log('No text extracted using pdf-parse. Falling back to Gemini OCR...');
-      const ocrText = await extractTextFromImagePdf(filePath);
-      if (ocrText && ocrText.trim()) {
-        const { chunkText } = require('../services/pdfService');
-        chunks = chunkText(ocrText);
+    if (!extractedText) {
+      try {
+        console.log('Attempting text extraction using pdf-parse...');
+        const parsed = await extractTextFromPdf(filePath);
+        extractedText = parsed.text || '';
+      } catch (parseError) {
+        console.warn('pdf-parse failed to read PDF structure.', parseError.message);
       }
-      
-      if (!chunks || chunks.length === 0) {
-        throw new Error('The uploaded PDF appears to be empty, corrupted, or has no readable text. Please upload a valid study material PDF.');
+    }
+    
+    // If not a technical type (so we ran pdf-parse first) and it yielded no text, or if we still have no text
+    if (!extractedText) {
+      try {
+        console.log('No text extracted. Attempting Gemini OCR fallback...');
+        extractedText = await extractTextFromImagePdf(filePath);
+      } catch (ocrError) {
+        console.error('Gemini OCR fallback failed:', ocrError.message);
       }
+    }
+    
+    if (extractedText && extractedText.trim()) {
+      const { chunkText } = require('../services/pdfService');
+      chunks = chunkText(extractedText);
+    } else {
+      throw new Error('The uploaded PDF appears to be empty, corrupted, or has no readable text. Please upload a valid study material PDF.');
     }
 
     // Validate if the document contains sufficient content (reject short/single-topic PDFs)
@@ -88,16 +109,40 @@ const generateQuestions = async (req, res) => {
     
     if (Number(config.thirteenMark) > 0 || Number(config.sixteenMark) > 0) {
       console.log('Generating 13/16 mark questions using Gemini...');
-      const geminiQuestionsString = await generateQuestionsFromContext(topChunks, longQuestionConfig);
+      let geminiQuestionsString;
+      let geminiFailed = false;
       try {
+        geminiQuestionsString = await generateQuestionsFromContext(topChunks, longQuestionConfig);
         const cleanedString = geminiQuestionsString.replace(/```json/g, '').replace(/```/g, '').trim();
         longQuestions = JSON.parse(cleanedString);
         if (!Array.isArray(longQuestions)) {
           longQuestions = longQuestions.questions || [];
         }
       } catch (e) {
-        console.error('Failed to parse Gemini output as JSON:', geminiQuestionsString);
-        throw new Error('Failed to generate 13/16-mark questions. Gemini output was not valid JSON.');
+        console.warn('Gemini 13/16 mark generation failed, checking for Groq fallback:', e.message);
+        geminiFailed = true;
+      }
+
+      if (geminiFailed) {
+        if (useGroq) {
+          try {
+            console.log('Generating 13/16 mark questions using Groq fallback...');
+            const groqService = require('../services/groqService');
+            const groqQuestionsString = await groqService.generateQuestionsFromContext(topChunks, {
+              ...longQuestionConfig,
+              twoMark: 0,
+              thirteenMark: config.thirteenMark,
+              sixteenMark: config.sixteenMark
+            });
+            const parsed = JSON.parse(groqQuestionsString);
+            longQuestions = parsed.questions || parsed;
+          } catch (groqErr) {
+            console.error('Groq 13/16 mark fallback failed:', groqErr.message);
+            throw new Error('Failed to generate 13/16-mark questions with both Gemini and Groq: ' + groqErr.message);
+          }
+        } else {
+          throw new Error('Gemini generation failed, and Groq is not configured as a fallback. Please check your Gemini API key status.');
+        }
       }
     }
     
@@ -106,15 +151,18 @@ const generateQuestions = async (req, res) => {
     // Step B: Generate 2-mark questions using Groq if key is present (otherwise use Gemini)
     if (Number(config.twoMark) > 0) {
       const excludeTopics = longQuestions.map(q => q.topic).filter(t => t && t.trim() !== '');
+      const excludeQuestionTexts = longQuestions.map(q => q.text).filter(t => t && t.trim() !== '');
       const shortQuestionConfig = { 
         twoMark: config.twoMark, 
         difficulty: config.difficulty, 
         withAnswers: config.withAnswers,
-        excludeTopics: excludeTopics
+        excludeTopics: excludeTopics,
+        excludeQuestionTexts: excludeQuestionTexts,
+        questionType: config.questionType
       };
       
-      // We pass the top 6 chunks to Groq to stay under 12,000 TPM limit
-      const groqChunks = topChunks.slice(0, 6);
+      // We pass the top 3 chunks to Groq to stay under rate limits
+      const groqChunks = topChunks.slice(0, 3);
       let shortQuestions = [];
       let groqFailed = false;
 
@@ -149,6 +197,26 @@ const generateQuestions = async (req, res) => {
 
       questions.push(...shortQuestions);
     }
+
+    // Programmatic auto-repair of common math errors (like converting "prove 3 is irrational" to "prove √3 is irrational")
+    const fixMathPhrasing = (text) => {
+      if (typeof text !== 'string') return text;
+      
+      // Match "prove/show that <number> is (an) irrational" (case-insensitive)
+      let repaired = text.replace(
+        /\b(prove|show)\s+(that\s+)?(\d+)\s+is\s+(an\s+)?irrational\b/gi,
+        (match, verb, thatWord, num, anWord) => {
+          return `${verb} ${thatWord || ''}√${num} is ${anWord || ''}irrational`;
+        }
+      );
+      
+      return repaired;
+    };
+
+    questions.forEach((q) => {
+      if (q.text) q.text = fixMathPhrasing(q.text);
+      if (q.modelAnswer) q.modelAnswer = fixMathPhrasing(q.modelAnswer);
+    });
 
     // Sort questions by marks (2-marks first, then 13, then 16) and renumber sequentially
     questions.sort((a, b) => Number(a.marks) - Number(b.marks));
