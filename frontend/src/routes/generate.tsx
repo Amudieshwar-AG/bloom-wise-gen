@@ -53,6 +53,7 @@ function GeneratePage() {
   const [sixteenMark, setSixteenMark] = useState(3);
   const [sixteenPattern, setSixteenPattern] = useState("single");
   const [difficulty, setDifficulty] = useState<Difficulty>("Medium");
+  const [questionType, setQuestionType] = useState<string>("mixed");
   const [withAnswers, setWithAnswers] = useState(true);
   const [loading, setLoading] = useState(false);
 
@@ -89,6 +90,7 @@ function GeneratePage() {
       formData.append('sixteenPattern', sixteenPattern);
       formData.append('difficulty', difficulty);
       formData.append('withAnswers', String(withAnswers));
+      formData.append('questionType', questionType);
 
       const response = await fetch('http://localhost:5000/api/questions/generate', {
         method: 'POST',
@@ -259,6 +261,22 @@ function GeneratePage() {
               </div>
 
               <div className="grid gap-2">
+                <Label htmlFor="questionType">Question Type Focus</Label>
+                <Select value={questionType} onValueChange={setQuestionType}>
+                  <SelectTrigger className="rounded-xl" id="questionType">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="mixed">Mixed (Default)</SelectItem>
+                    <SelectItem value="theory">Theory Only</SelectItem>
+                    <SelectItem value="maths">Maths & Numerical Problems</SelectItem>
+                    <SelectItem value="algorithms">Algorithms & DSA</SelectItem>
+                    <SelectItem value="derivations">Derivations & Proofs</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid gap-2">
                 <Label>Difficulty</Label>
                 <div className="grid grid-cols-3 gap-2">
                   {difficulties.map((d) => (
@@ -300,6 +318,7 @@ function GeneratePage() {
               <Row label="13-Mark questions" value={`${thirteenMark} (${labelFor(thirteenPattern)})`} />
               <Row label="16-Mark questions" value={`${sixteenMark} (${labelFor(sixteenPattern)})`} />
               <Row label="Difficulty" value={difficulty} />
+              <Row label="Type Focus" value={labelForType(questionType)} />
               <Row label="Answers" value={withAnswers ? "Included" : "Excluded"} />
               <div className="border-t border-border pt-3">
                 <Row
@@ -354,6 +373,17 @@ function labelFor(p: string) {
     "10+6": "10 + 6",
   };
   return map[p] ?? p;
+}
+
+function labelForType(t: string) {
+  const map: Record<string, string> = {
+    mixed: "Mixed (Default)",
+    theory: "Theory Only",
+    maths: "Maths & Numerical Problems",
+    algorithms: "Algorithms & DSA",
+    derivations: "Derivations & Proofs",
+  };
+  return map[t] ?? t;
 }
 
 function NumberInput({ id, value, onChange, min = 0 }: { id?: string; value: number; onChange: (v: number) => void; min?: number }) {
