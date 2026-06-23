@@ -52,9 +52,9 @@ const generateQuestions = async (req, res) => {
     }
     
     // If not a technical type (so we ran pdf-parse first) and it yielded no text, or if we still have no text
-    if (!extractedText) {
+    if (!extractedText || !extractedText.trim()) {
       try {
-        console.log('No text extracted. Attempting Gemini OCR fallback...');
+        console.log('No text extracted or only whitespace. Attempting Gemini OCR fallback...');
         extractedText = await extractTextFromImagePdf(filePath);
       } catch (ocrError) {
         console.error('Gemini OCR fallback failed:', ocrError.message);

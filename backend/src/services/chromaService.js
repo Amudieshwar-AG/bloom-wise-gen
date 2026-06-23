@@ -1,8 +1,18 @@
 const { ChromaClient } = require('chromadb');
 
-const client = new ChromaClient({
-  path: process.env.CHROMA_URL || 'http://localhost:8000',
-});
+let chromaOptions = { host: 'localhost', port: 8000, ssl: false };
+const chromaUrl = process.env.CHROMA_URL || 'http://localhost:8000';
+try {
+  const url = new URL(chromaUrl);
+  chromaOptions = {
+    host: url.hostname,
+    port: url.port ? parseInt(url.port, 10) : (url.protocol === 'https:' ? 443 : 80),
+    ssl: url.protocol === 'https:'
+  };
+} catch (e) {
+  console.warn('Invalid CHROMA_URL, falling back to localhost:8000');
+}
+const client = new ChromaClient(chromaOptions);
 
 const storeChunks = async (collectionName, chunks) => {
   try {

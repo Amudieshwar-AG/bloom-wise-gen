@@ -6,6 +6,7 @@ const dotenv = require('dotenv');
 dotenv.config();
 
 const questionRoutes = require('./routes/questionRoutes');
+const exportRoutes = require('./routes/exportRoutes');
 
 const app = express();
 const port = process.env.PORT || 5000;
@@ -16,6 +17,7 @@ app.use(express.json());
 
 // Routes
 app.use('/api/questions', questionRoutes);
+app.use('/api/export', exportRoutes);
 
 // Start server
 app.listen(port, () => {
