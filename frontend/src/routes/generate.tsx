@@ -98,7 +98,12 @@ function GeneratePage() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to generate questions');
+        let errorMsg = 'Failed to generate questions';
+        try {
+          const errData = await response.json();
+          if (errData.error) errorMsg = errData.error;
+        } catch (e) {}
+        throw new Error(errorMsg);
       }
 
       const data = await response.json();
@@ -108,9 +113,9 @@ function GeneratePage() {
 
       toast.success("Question bank generated!");
       navigate({ to: "/results" });
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      toast.error("Failed to generate questions. Please try again.");
+      toast.error(error.message || "Failed to generate questions. Please try again.");
     } finally {
       setLoading(false);
     }

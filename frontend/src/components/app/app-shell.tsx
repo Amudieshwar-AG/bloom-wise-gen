@@ -54,15 +54,6 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           );
         })}
       </nav>
-      <div className="m-3 rounded-2xl bg-gradient-brand p-4 text-primary-foreground">
-        <p className="text-sm font-semibold">Free Plan</p>
-        <p className="mt-1 text-xs text-primary-foreground/80">
-          24 / 50 generations used this month
-        </p>
-        <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-primary-foreground/25">
-          <div className="h-full w-[48%] rounded-full bg-primary-foreground" />
-        </div>
-      </div>
     </div>
   );
 }

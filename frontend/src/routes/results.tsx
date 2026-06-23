@@ -80,6 +80,48 @@ function Results() {
     }
   };
 
+  const [downloading, setDownloading] = useState<"docx" | "pdf" | null>(null);
+
+  const handleDownload = async (format: "docx" | "pdf") => {
+    if (questions.length === 0) {
+      toast.error("No questions to export");
+      return;
+    }
+    
+    setDownloading(format);
+    toast.info(`Generating ${format.toUpperCase()}...`);
+    
+    try {
+      const response = await fetch("http://localhost:5000/api/export", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ format, questions }),
+      });
+      
+      if (!response.ok) {
+        throw new Error("Failed to export document");
+      }
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `QuestionBank.${format}`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      a.remove();
+      toast.success(`Downloaded ${format.toUpperCase()}`);
+    } catch (error) {
+      console.error(error);
+      toast.error(`Failed to download ${format.toUpperCase()}`);
+    } finally {
+      setDownloading(null);
+    }
+  };
+
   return (
     <AppShell
       title="Generated Question Bank"
@@ -90,14 +132,19 @@ function Results() {
             {copiedAll ? <Check className="h-4 w-4 text-success" /> : <Copy className="h-4 w-4" />}
             Copy All
           </Button>
-          <Button variant="outline" onClick={() => toast.success("Downloading DOCX…")}>
-            <FileText className="h-4 w-4" /> DOCX
+          <Button 
+            variant="outline" 
+            onClick={() => handleDownload("docx")}
+            disabled={downloading !== null}
+          >
+            {downloading === "docx" ? <LoadingSpinner size={16} /> : <FileText className="h-4 w-4" />} DOCX
           </Button>
           <Button
             className="bg-gradient-brand text-primary-foreground shadow-glow hover:opacity-90"
-            onClick={() => toast.success("Downloading PDF…")}
+            onClick={() => handleDownload("pdf")}
+            disabled={downloading !== null}
           >
-            <FileDown className="h-4 w-4" /> PDF
+            {downloading === "pdf" ? <LoadingSpinner size={16} /> : <FileDown className="h-4 w-4" />} PDF
           </Button>
         </div>
       }
