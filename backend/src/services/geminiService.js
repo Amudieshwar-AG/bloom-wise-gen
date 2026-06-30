@@ -239,9 +239,10 @@ const generateQuestionsFromContext = async (contextChunks, config) => {
       excludeTopics = [], 
       excludeQuestionTexts = [],
       apiKeySelector = 'primary', 
-      questionType = 'mixed' 
+      questionType = 'mixed',
+      customSuggestion = ''
     } = config;
-
+    
     const contextText = contextChunks.map(c => `[Chunk ID: ${c.chunk_id}]\n${c.content}`).join('\n\n');
 
     let exclusionPrompt = '';
@@ -262,7 +263,7 @@ const generateQuestionsFromContext = async (contextChunks, config) => {
     } else if (questionType === 'maths') {
       typePrompt = 'Focus ONLY on active mathematical problems, numerical calculations, equations, and quantitative step-by-step problem-solving. Every single question (including 2-mark questions) must require the student to calculate a value, solve an equation, apply a formula to specific numerical cases, or prove a specific mathematical case. Avoid purely descriptive, theoretical, or definitional questions (e.g. do NOT generate questions like "What is Euclid\'s division lemma?", "Explain real numbers", or "Define rational numbers"). Instead, ask the student to apply the concept (e.g. "Use Euclid\'s division algorithm to find the HCF of 135 and 225" or "Prove that √5 is an irrational number"). Ensure that the \'modelAnswer\' shows the full step-by-step mathematical working and final answer.';
     } else if (questionType === 'algorithms') {
-      typePrompt = 'Focus ONLY on algorithm design, Data Structures and Algorithms (DSA), complexity analysis (Big-O notation), pseudocode, logic dry-runs, trace tables, and stack/heap memory visualizations. The questions should ask the student to analyze, dry-run, or design algorithm steps. For 13/16-mark questions, the \'modelAnswer\' must contain a clear pseudocode or logical implementation outline. If the retrieved context does not contain algorithms or code, fallback gracefully to generating questions about the workflow, operational steps, or logic of the systems described.';
+      typePrompt = 'Focus ONLY on algorithm design, Data Structures and Algorithms (DSA), complexity analysis (Big-O notation), pseudocode, logic dry-runs, trace tables, and stack/heap memory visualizations. The questions should ask the student to analyze, dry-run, or design algorithm steps. The \'modelAnswer\' must contain a clear pseudocode or logical implementation outline. If the retrieved context does not contain algorithms or code, fallback gracefully to generating questions about the workflow, operational steps, or logic of the systems described.';
     } else if (questionType === 'derivations') {
       typePrompt = 'Focus ONLY on proofs, derivations, mathematical theorems, proving formulas from first principles, and step-by-step analytical proof reasoning. The questions must ask the student to prove, derive, or analytically verify a formula or theorem. The \'modelAnswer\' must show the step-by-step derivation blocks leading to the final proven expression. If the retrieved context does not contain derivations or mathematical equations, fallback gracefully to generating questions asking to analyze or explain the theoretical origin, assumptions, or reasoning behind the concepts.';
     }
@@ -287,7 +288,10 @@ const generateQuestionsFromContext = async (contextChunks, config) => {
         patternInstructions += `- Each of the 16-mark questions must be a single standalone 16-mark question.\n`;
       }
     }
-    const prompt = `You are the core document analysis engine of BloomAI, an expert exam question generator specializing in Bloom's Taxonomy.
+
+    const customInstructionPrompt = customSuggestion ? `\nUSER CUSTOM INSTRUCTIONS (CRITICAL):\n- ${customSuggestion}\n` : '';
+
+    const prompt = `You are the core document analysis engine of BloomAI, an expert exam question generator specializing in Bloom's Taxonomy.${customInstructionPrompt}
 Your task is to generate examination questions based STRICTLY on the retrieved context provided below.
 
 IMPORTANT RULES:
@@ -295,6 +299,7 @@ IMPORTANT RULES:
 - Use retrieved chunks as the source of truth.
 - Always maintain chunk-to-question traceability (include the source chunk_id).
 - Ensure Bloom's Taxonomy compliance.
+- PLAIN TEXT FORMATTING ONLY: DO NOT use Markdown tables, LaTeX math syntax (e.g. $ or $$), or any special formatting symbols. Write all equations, variables, and tabular data in plain text (e.g. 12x_1 + 16x_2 instead of $12x_1 + 16x_2$). Represent tabular data using simple text lists or spaced columns.
 - Maintain a ${difficulty || 'Medium'} difficulty level.
 - For 16-mark questions: If you cannot formulate a highly complex 16-mark question using the theory alone, you MUST directly extract a question or worked example from the PDF context and use it as the question.
 - ${exclusionPrompt}

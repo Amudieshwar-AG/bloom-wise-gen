@@ -23,6 +23,7 @@ const generateQuestions = async (req, res) => {
       difficulty: req.body.difficulty || 'Medium',
       withAnswers: req.body.withAnswers,
       questionType: req.body.questionType || 'mixed',
+      customSuggestion: req.body.customSuggestion || ''
     };
 
     // 1 & 2. Extract and chunk text from the uploaded PDF
@@ -96,8 +97,8 @@ const generateQuestions = async (req, res) => {
     const queryEmbeddingVector = queryEmbeddings[0];
 
     // 7. Similarity Search / Retrieval
-    // Retrieve the top 10 most relevant chunks
-    const topChunks = await querySimilarChunks(collectionName, queryEmbeddingVector, 10);
+    // Retrieve the top 5 most relevant chunks to fit within Groq's 12k TPM limit
+    const topChunks = await querySimilarChunks(collectionName, queryEmbeddingVector, 5);
 
     // 8 & 9. Context Assembly and Question Generation
     let questions = [];
@@ -225,7 +226,18 @@ const generateQuestions = async (req, res) => {
       q.id = `q${idx + 1}`;
     });
 
-    res.json({ questions });
+    // Save history and update stats
+    const historyModel = require('../models/historyModel');
+    const statsModel = require('../models/statsModel');
+    
+    statsModel.incrementPdfUploads();
+    statsModel.incrementGenerations();
+    
+    const bankId = crypto.randomUUID();
+    const originalFilename = req.file ? req.file.originalname : 'Document.pdf';
+    historyModel.saveQuestionBank(bankId, originalFilename, config, questions);
+
+    res.json({ success: true, id: bankId, questions });
   } catch (error) {
     console.error('Error in generateQuestions controller:', error);
     res.status(500).json({ error: 'Failed to generate questions from PDF. ' + error.message });

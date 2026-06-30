@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Eye, Download, Trash2, FileText, FileX } from "lucide-react";
 import { toast } from "sonner";
@@ -45,13 +45,32 @@ const statusStyles: Record<HistoryEntry["status"], string> = {
 
 function HistoryPage() {
   const navigate = useNavigate();
-  const [rows, setRows] = useState<HistoryEntry[]>([]);
-  const [pending, setPending] = useState<HistoryEntry | null>(null);
+  const [rows, setRows] = useState<any[]>([]);
+  const [pending, setPending] = useState<any | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+
+  useEffect(() => {
+    const fetchHistory = async () => {
+      try {
+        const res = await fetch('http://localhost:5000/api/history');
+        const data = await res.json();
+        if (data.success) {
+          setRows(data.history);
+        }
+      } catch (error) {
+        console.error('Error fetching history:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchHistory();
+  }, []);
 
   const confirmDelete = () => {
     if (!pending) return;
     setRows((r) => r.filter((row) => row.id !== pending.id));
-    toast.success(`Deleted "${pending.pdfName}"`);
+    toast.success(`Deleted "${pending.filename}"`);
     setPending(null);
   };
 
@@ -92,16 +111,16 @@ function HistoryPage() {
                         <FileText className="h-4 w-4" />
                       </span>
                       <div className="min-w-0">
-                        <p className="truncate font-medium">{row.pdfName}</p>
-                        <p className="text-xs text-muted-foreground sm:hidden">{row.date}</p>
+                        <p className="truncate font-medium">{row.filename}</p>
+                        <p className="text-xs text-muted-foreground sm:hidden">{new Date(row.created_at).toLocaleDateString()}</p>
                       </div>
                     </div>
                   </TableCell>
-                  <TableCell className="hidden text-muted-foreground sm:table-cell">{row.date}</TableCell>
-                  <TableCell className="hidden md:table-cell">{row.questions}</TableCell>
+                  <TableCell className="hidden text-muted-foreground sm:table-cell">{new Date(row.created_at).toLocaleDateString()}</TableCell>
+                  <TableCell className="hidden md:table-cell">{row.questions?.length || 0}</TableCell>
                   <TableCell>
-                    <Badge variant="outline" className={cn("rounded-full border font-medium", statusStyles[row.status])}>
-                      {row.status}
+                    <Badge variant="outline" className={cn("rounded-full border font-medium", statusStyles["Completed"])}>
+                      Completed
                     </Badge>
                   </TableCell>
                   <TableCell>

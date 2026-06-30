@@ -55,6 +55,7 @@ function GeneratePage() {
   const [difficulty, setDifficulty] = useState<Difficulty>("Medium");
   const [questionType, setQuestionType] = useState<string>("mixed");
   const [withAnswers, setWithAnswers] = useState(true);
+  const [customSuggestion, setCustomSuggestion] = useState("");
   const [loading, setLoading] = useState(false);
 
   const acceptFile = (f: File) => {
@@ -91,6 +92,7 @@ function GeneratePage() {
       formData.append('difficulty', difficulty);
       formData.append('withAnswers', String(withAnswers));
       formData.append('questionType', questionType);
+      formData.append('customSuggestion', customSuggestion);
 
       const response = await fetch('http://localhost:5000/api/questions/generate', {
         method: 'POST',
@@ -300,6 +302,17 @@ function GeneratePage() {
                     </button>
                   ))}
                 </div>
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="customSuggestion">Custom Instructions / Suggestions (Optional)</Label>
+                <textarea
+                  id="customSuggestion"
+                  value={customSuggestion}
+                  onChange={(e) => setCustomSuggestion(e.target.value)}
+                  placeholder="e.g. Focus only on the last 5 pages, generate practical examples, etc."
+                  className="flex min-h-[80px] w-full rounded-xl border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                />
               </div>
 
               <div className="flex items-center justify-between rounded-xl border border-border bg-muted/40 px-4 py-3">
