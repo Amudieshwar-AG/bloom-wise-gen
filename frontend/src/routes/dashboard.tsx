@@ -20,14 +20,11 @@ import {
   Area,
   AreaChart,
 } from "recharts";
+import { useState, useEffect } from "react";
 import { AppShell } from "@/components/app/app-shell";
 import { StatCard } from "@/components/app/stat-card";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-const bloomDistribution: any[] = [];
-const questionDistribution: any[] = [];
-const sampleHistory: any[] = [];
-const usageTrend: any[] = [];
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({
@@ -40,6 +37,77 @@ export const Route = createFileRoute("/dashboard")({
 });
 
 function Dashboard() {
+  const [stats, setStats] = useState({ total_pdfs: 0, total_generated: 0, total_exports: 0, total_tokens: 0 });
+  const [history, setHistory] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [statsRes, historyRes] = await Promise.all([
+          fetch('http://localhost:5000/api/stats'),
+          fetch('http://localhost:5000/api/history')
+        ]);
+        const statsData = await statsRes.json();
+        const historyData = await historyRes.json();
+        
+        if (statsData.success && statsData.stats) {
+          setStats(statsData.stats);
+        }
+        if (historyData.success && historyData.history) {
+          setHistory(historyData.history);
+        }
+      } catch (err) {
+        console.error("Failed to fetch dashboard data", err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
+
+  // Compute distributions
+  const bloomDistribution = [
+    { level: "Remember", count: 0 },
+    { level: "Understand", count: 0 },
+    { level: "Apply", count: 0 },
+    { level: "Analyze", count: 0 },
+    { level: "Evaluate", count: 0 },
+    { level: "Create", count: 0 },
+  ];
+
+  let twoMarks = 0;
+  let thirteenMarks = 0;
+  let sixteenMarks = 0;
+
+  history.forEach(bank => {
+    bank.questions?.forEach((q: any) => {
+      // Bloom
+      const level = bloomDistribution.find(b => b.level.toLowerCase() === q.bloom?.toLowerCase());
+      if (level) level.count++;
+      
+      // Marks
+      if (q.marks === 2) twoMarks++;
+      else if (q.marks === 13) thirteenMarks++;
+      else if (q.marks === 16) sixteenMarks++;
+    });
+  });
+
+  const questionDistribution = [
+    { name: "2 Marks", value: twoMarks, fill: "var(--color-chart-1)" },
+    { name: "13 Marks", value: thirteenMarks, fill: "var(--color-chart-2)" },
+    { name: "16 Marks", value: sixteenMarks, fill: "var(--color-chart-3)" },
+  ];
+
+  const usageTrend = [
+    { month: "Jan", banks: 0 },
+    { month: "Feb", banks: 0 },
+    { month: "Mar", banks: 0 },
+    { month: "Apr", banks: 0 },
+    { month: "May", banks: 0 },
+    { month: "Jun", banks: history.length }, // Simplify to current month for now
+  ];
+
   return (
     <AppShell
       title="Welcome back, Dr. Rao"
@@ -53,10 +121,10 @@ function Dashboard() {
       }
     >
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="PDFs Uploaded" value="0" icon={FileText} trend={{ value: "0%", up: true }} accent="primary" />
-        <StatCard label="Question Banks Generated" value="0" icon={Layers} trend={{ value: "0%", up: true }} accent="purple" />
-        <StatCard label="Exports Downloaded" value="0" icon={Download} trend={{ value: "0%", up: true }} accent="cyan" />
-        <StatCard label="AI Usage (tokens)" value="0" icon={Activity} trend={{ value: "0%", up: true }} accent="success" />
+        <StatCard label="PDFs Uploaded" value={stats.total_pdfs.toString()} icon={FileText} trend={{ value: "0%", up: true }} accent="primary" />
+        <StatCard label="Question Banks Generated" value={stats.total_generated.toString()} icon={Layers} trend={{ value: "0%", up: true }} accent="purple" />
+        <StatCard label="Exports Downloaded" value={stats.total_exports.toString()} icon={Download} trend={{ value: "0%", up: true }} accent="cyan" />
+        <StatCard label="AI Usage (tokens)" value={stats.total_tokens.toString()} icon={Activity} trend={{ value: "0%", up: true }} accent="success" />
       </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-3">
@@ -170,19 +238,22 @@ function Dashboard() {
             </Button>
           </div>
           <ul className="space-y-3">
-            {sampleHistory.slice(0, 4).map((h) => (
+            {history.slice(0, 4).map((h: any) => (
               <li key={h.id} className="flex items-center gap-3 rounded-xl border border-border p-3">
                 <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
                   <FileText className="h-4 w-4" />
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">{h.pdfName}</p>
+                  <p className="truncate text-sm font-medium">{h.filename}</p>
                   <p className="text-xs text-muted-foreground">
-                    {h.questions} questions · {h.date}
+                    {h.questions?.length || 0} questions · {new Date(h.created_at).toLocaleDateString()}
                   </p>
                 </div>
               </li>
             ))}
+            {history.length === 0 && (
+              <p className="text-sm text-muted-foreground">No recent activity.</p>
+            )}
           </ul>
         </Card>
       </div>

@@ -57,6 +57,9 @@ const exportDocument = async (req, res) => {
       }
 
       // Set headers and send the file
+      const statsModel = require('../models/statsModel');
+      statsModel.incrementExports();
+
       const contentType = exportFormat === 'pdf' 
         ? 'application/pdf' 
         : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';

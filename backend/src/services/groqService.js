@@ -31,6 +31,7 @@ const callGroq = async (prompt, apiKey) => {
       }
     ],
     temperature: 0.1,
+    max_completion_tokens: 3500, // Hard limit to ensure we don't breach 12k TPM free tier limit
     response_format: { type: "json_object" }
   });
 
@@ -72,6 +73,9 @@ const callGroq = async (prompt, apiKey) => {
         } else if (res.statusCode === 429) {
           console.error('Groq rate limit exceeded:', body);
           reject(new Error('Groq API Rate Limit Exceeded (12,000 TPM limit). Please wait 60 seconds before clicking generate again.'));
+        } else if (res.statusCode === 413) {
+          console.error('Groq payload too large:', body);
+          reject(new Error('The request is too large for Groq API. We have reduced the chunk size, but if you see this, the document might be excessively dense.'));
         } else {
           console.error('Groq API error details:', body);
           reject(new Error(`Groq API Error Status: ${res.statusCode}`));
@@ -96,7 +100,8 @@ const generateQuestionsFromContext = async (contextChunks, config) => {
       withAnswers, 
       excludeTopics = [], 
       excludeQuestionTexts = [],
-      questionType = 'mixed' 
+      questionType = 'mixed',
+      customSuggestion = ''
     } = config;
     const apiKey = process.env.GROQ_API_KEY;
 
@@ -150,7 +155,9 @@ const generateQuestionsFromContext = async (contextChunks, config) => {
       }
     }
 
-    const prompt = `You are the core document analysis engine of BloomAI, an expert exam question generator specializing in Bloom's Taxonomy.
+    const customInstructionPrompt = customSuggestion ? `\nUSER CUSTOM INSTRUCTIONS (CRITICAL):\n- ${customSuggestion}\n` : '';
+
+    const prompt = `You are the core document analysis engine of BloomAI, an expert exam question generator specializing in Bloom's Taxonomy.${customInstructionPrompt}
 Your task is to generate examination questions based STRICTLY on the retrieved context provided below.
 
 IMPORTANT RULES:
@@ -158,6 +165,7 @@ IMPORTANT RULES:
 - Use retrieved chunks as the source of truth.
 - Always maintain chunk-to-question traceability (include the source chunk_id).
 - Ensure Bloom's Taxonomy compliance (Remember, Understand, Apply, Analyze, Evaluate, Create).
+- PLAIN TEXT FORMATTING ONLY: DO NOT use Markdown tables, LaTeX math syntax (e.g. $ or $$), or any special formatting symbols. Write all equations, variables, and tabular data in plain text (e.g. 12x_1 + 16x_2 instead of $12x_1 + 16x_2$). Represent tabular data using simple text lists or spaced columns.
 - Maintain a ${difficulty || 'Medium'} difficulty level.
 - ${exclusionPrompt}
 - ${typePrompt ? typePrompt : 'Provide a natural balance of theory, derivations, calculations, and algorithms based on what is available in the retrieved context.'}

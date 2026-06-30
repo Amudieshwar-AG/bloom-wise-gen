@@ -3,7 +3,8 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 
 // Load environment variables FIRST before importing routes/services
-dotenv.config();
+const path = require('path');
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 const questionRoutes = require('./routes/questionRoutes');
 const exportRoutes = require('./routes/exportRoutes');
@@ -16,8 +17,13 @@ app.use(cors());
 app.use(express.json());
 
 // Routes
+const historyRoutes = require('./routes/historyRoutes');
+const statsRoutes = require('./routes/statsRoutes');
+
 app.use('/api/questions', questionRoutes);
 app.use('/api/export', exportRoutes);
+app.use('/api/history', historyRoutes);
+app.use('/api/stats', statsRoutes);
 
 // Start server
 app.listen(port, () => {

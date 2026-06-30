@@ -62,6 +62,13 @@ def export_to_pdf(questions, output_path):
         ("Part-C (16 Marks)", part_c),
     ]
 
+    import unicodedata
+    def clean_text(text):
+        if not text: return ""
+        text = text.replace('\n', '<br/>')
+        # Normalize unicode to avoid missing glyph black squares in reportlab
+        return unicodedata.normalize('NFKD', text)
+
     for title, part_questions in sections:
         if not part_questions:
             continue
@@ -70,12 +77,12 @@ def export_to_pdf(questions, output_path):
         Story.append(Spacer(1, 6))
 
         for idx, q in enumerate(part_questions, 1):
-            q_text = q.get('text', '').replace('\n', '<br/>')
+            q_text = clean_text(q.get('text', ''))
             text_html = f"<b>{idx}.</b> {q_text}"
             Story.append(Paragraph(text_html, body_style))
             
             if q.get('modelAnswer'):
-                ans_text = q.get('modelAnswer', '').replace('\n', '<br/>')
+                ans_text = clean_text(q.get('modelAnswer', ''))
                 Story.append(Paragraph(f"<b>Answer Key:</b><br/>{ans_text}", body_style))
 
             Story.append(Spacer(1, 12))

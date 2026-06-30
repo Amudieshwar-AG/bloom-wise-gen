@@ -67,6 +67,7 @@ const querySimilarChunks = async (collectionName, queryEmbedding, topK = 10) => 
     return similarChunks;
   } catch (error) {
     console.error('Error querying Chroma:', error);
+    require('fs').writeFileSync('chroma_error.log', error.stack || error.toString());
     throw new Error('Failed to retrieve chunks from Vector DB.');
   }
 };
