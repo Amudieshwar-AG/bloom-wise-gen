@@ -57,14 +57,20 @@ function GeneratePage() {
   const [withAnswers, setWithAnswers] = useState(true);
   const [customSuggestion, setCustomSuggestion] = useState("");
   const [loading, setLoading] = useState(false);
+  const [inputType, setInputType] = useState<"file" | "text">("file");
+  const [textContent, setTextContent] = useState("");
 
   const acceptFile = (f: File) => {
-    if (f.type !== "application/pdf") {
-      toast.error("Please upload a PDF file");
+    const validTypes = ["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"];
+    const validExtensions = [".pdf", ".docx"];
+    const isDocxExt = f.name.toLowerCase().endsWith(".docx");
+    
+    if (!validTypes.includes(f.type) && !isDocxExt) {
+      toast.error("Please upload a PDF or DOCX file");
       return;
     }
     setFileData({ file: f, name: f.name, size: `${(f.size / 1024 / 1024).toFixed(2)} MB` });
-    toast.success("PDF uploaded successfully");
+    toast.success("Document uploaded successfully");
   };
 
   const onDrop = (e: DragEvent) => {
@@ -75,15 +81,23 @@ function GeneratePage() {
   };
 
   const generate = async () => {
-    if (!fileData) {
-      toast.error("Upload a PDF before generating");
+    if (inputType === "file" && !fileData) {
+      toast.error("Upload a document before generating");
+      return;
+    }
+    if (inputType === "text" && textContent.trim().length < 50) {
+      toast.error("Please paste some valid text before generating");
       return;
     }
     setLoading(true);
     
     try {
       const formData = new FormData();
-      formData.append('pdf', fileData.file);
+      if (inputType === "file" && fileData) {
+        formData.append('document', fileData.file);
+      } else {
+        formData.append('text', textContent);
+      }
       formData.append('twoMark', String(twoMark));
       formData.append('thirteenMark', String(thirteenMark));
       formData.append('thirteenPattern', thirteenPattern);
@@ -133,70 +147,110 @@ function GeneratePage() {
       <div className="grid gap-6 lg:grid-cols-5">
         {/* Left: upload + config */}
         <div className="space-y-6 lg:col-span-3">
-          {/* Upload */}
           <Card className="shadow-card rounded-2xl border-border p-6">
-            <div className="mb-4 flex items-center gap-2">
-              <span className="grid h-7 w-7 place-items-center rounded-lg bg-primary/10 text-sm font-bold text-primary">1</span>
-              <h3 className="font-semibold">Upload PDF</h3>
+            <div className="mb-4 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="grid h-7 w-7 place-items-center rounded-lg bg-primary/10 text-sm font-bold text-primary">1</span>
+                <h3 className="font-semibold">Source Material</h3>
+              </div>
+              
+              <div className="flex rounded-lg border border-border p-1 bg-muted/30">
+                <button
+                  type="button"
+                  onClick={() => setInputType("file")}
+                  className={cn(
+                    "px-3 py-1.5 text-xs font-medium rounded-md transition-colors",
+                    inputType === "file" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  File Upload
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setInputType("text")}
+                  className={cn(
+                    "px-3 py-1.5 text-xs font-medium rounded-md transition-colors",
+                    inputType === "text" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  Text Box
+                </button>
+              </div>
             </div>
 
-            {!fileData ? (
-              <button
-                type="button"
-                onClick={() => inputRef.current?.click()}
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  setDragging(true);
-                }}
-                onDragLeave={() => setDragging(false)}
-                onDrop={onDrop}
-                className={cn(
-                  "flex w-full flex-col items-center justify-center rounded-2xl border-2 border-dashed px-6 py-12 text-center transition-colors",
-                  dragging
-                    ? "border-primary bg-primary/5"
-                    : "border-border bg-muted/40 hover:border-primary/50 hover:bg-muted/60",
+            {inputType === "file" ? (
+              <>
+                {!fileData ? (
+                  <button
+                    type="button"
+                    onClick={() => inputRef.current?.click()}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      setDragging(true);
+                    }}
+                    onDragLeave={() => setDragging(false)}
+                    onDrop={onDrop}
+                    className={cn(
+                      "flex w-full flex-col items-center justify-center rounded-2xl border-2 border-dashed px-6 py-12 text-center transition-colors",
+                      dragging
+                        ? "border-primary bg-primary/5"
+                        : "border-border bg-muted/40 hover:border-primary/50 hover:bg-muted/60",
+                    )}
+                  >
+                    <span className="grid h-14 w-14 place-items-center rounded-2xl bg-gradient-brand text-primary-foreground shadow-glow">
+                      <UploadCloud className="h-7 w-7" />
+                    </span>
+                    <p className="mt-4 font-medium">Drag & drop your DOCX or PDF here</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      or <span className="font-medium text-primary">browse files</span> · Max 20MB
+                    </p>
+                  </button>
+                ) : (
+                  <div className="flex items-center gap-4 rounded-2xl border border-border bg-muted/40 p-4">
+                    <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-destructive/10 text-destructive">
+                      <FileText className="h-6 w-6" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-medium">{fileData.name}</p>
+                      <p className="flex items-center gap-1.5 text-sm text-success">
+                        <CheckCircle2 className="h-3.5 w-3.5" /> Uploaded · {fileData.size}
+                      </p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setFileData(null)}
+                      aria-label="Remove file"
+                      className="text-muted-foreground"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
                 )}
-              >
-                <span className="grid h-14 w-14 place-items-center rounded-2xl bg-gradient-brand text-primary-foreground shadow-glow">
-                  <UploadCloud className="h-7 w-7" />
-                </span>
-                <p className="mt-4 font-medium">Drag & drop your PDF here</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  or <span className="font-medium text-primary">browse files</span> · Max 20MB
-                </p>
-              </button>
+                <input
+                  ref={inputRef}
+                  type="file"
+                  accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) acceptFile(f);
+                  }}
+                />
+              </>
             ) : (
-              <div className="flex items-center gap-4 rounded-2xl border border-border bg-muted/40 p-4">
-                <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-destructive/10 text-destructive">
-                  <FileText className="h-6 w-6" />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium">{fileData.name}</p>
-                  <p className="flex items-center gap-1.5 text-sm text-success">
-                    <CheckCircle2 className="h-3.5 w-3.5" /> Uploaded · {fileData.size}
-                  </p>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setFileData(null)}
-                  aria-label="Remove file"
-                  className="text-muted-foreground"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
+              <div className="space-y-2">
+                <textarea
+                  value={textContent}
+                  onChange={(e) => setTextContent(e.target.value)}
+                  placeholder="Paste your syllabus, chapter content, or notes here..."
+                  className="flex min-h-[200px] w-full rounded-xl border border-input bg-transparent px-4 py-3 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 resize-y"
+                />
+                <p className="text-xs text-muted-foreground flex justify-end">
+                  {textContent.length} characters
+                </p>
               </div>
             )}
-            <input
-              ref={inputRef}
-              type="file"
-              accept="application/pdf"
-              className="hidden"
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) acceptFile(f);
-              }}
-            />
           </Card>
 
           {/* Config */}

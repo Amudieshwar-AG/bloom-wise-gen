@@ -22,10 +22,19 @@ db.exec(`
     total_exports INTEGER DEFAULT 0,
     total_tokens INTEGER DEFAULT 0
   );
+`);
 
-  -- Initialize usage stats row if not exists
-  INSERT OR IGNORE INTO usage_stats (id, total_pdfs, total_generated, total_exports, total_tokens)
-  VALUES (1, 0, 0, 0, 0);
+// Simple migration for existing database: add column if missing
+try {
+  db.exec('ALTER TABLE usage_stats ADD COLUMN total_generation_time_ms INTEGER DEFAULT 0;');
+} catch (e) {
+  // Ignore error if column already exists
+}
+
+// Now initialize usage stats row if not exists
+db.exec(`
+  INSERT OR IGNORE INTO usage_stats (id, total_pdfs, total_generated, total_exports, total_tokens, total_generation_time_ms)
+  VALUES (1, 0, 0, 0, 0, 0);
 `);
 
 module.exports = db;

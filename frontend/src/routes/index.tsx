@@ -75,7 +75,30 @@ const steps = [
   { num: "04", title: "Download", desc: "Export to PDF or DOCX, ready for the exam hall." },
 ];
 
+import { useState, useEffect } from "react";
+
 function Landing() {
+  const [stats, setStats] = useState({
+    generated: "0",
+    levels: "0",
+    time: "0 sec"
+  });
+
+  useEffect(() => {
+    fetch('http://localhost:5000/api/stats')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.stats) {
+          setStats({
+            generated: data.stats.total_generated.toString(),
+            levels: data.stats.total_generated > 0 ? "6" : "0", // Bloom's Taxonomy covers 6 levels
+            time: `${data.stats.average_generation_time || 0} sec`
+          });
+        }
+      })
+      .catch(err => console.error("Failed to fetch stats:", err));
+  }, []);
+
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <Navbar />
@@ -119,9 +142,9 @@ function Landing() {
               <div className="rounded-xl bg-card p-6 text-left sm:p-8">
                 <div className="grid gap-4 sm:grid-cols-3">
                   {[
-                    { k: "0", v: "Question banks generated" },
-                    { k: "0", v: "Bloom's levels covered" },
-                    { k: "0 sec", v: "Average generation time" },
+                    { k: stats.generated, v: "Question banks generated" },
+                    { k: stats.levels, v: "Bloom's levels covered" },
+                    { k: stats.time, v: "Average generation time" },
                   ].map((s) => (
                     <div key={s.v} className="rounded-xl bg-muted/50 p-4">
                       <p className="text-2xl font-bold text-gradient">{s.k}</p>

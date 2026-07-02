@@ -1,16 +1,18 @@
-const { extractTextFromPdf, chunkText } = require('../services/pdfService');
+const { extractTextFromPdf, chunkText, extractTextFromDocx } = require('../services/pdfService');
 const { generateEmbeddings, generateQuestionsFromContext, extractTextFromImagePdf } = require('../services/geminiService');
 const { storeChunks, querySimilarChunks, deleteCollection } = require('../services/chromaService');
 const fs = require('fs');
 const crypto = require('crypto');
 
 const generateQuestions = async (req, res) => {
+  const startTime = Date.now();
   let collectionName = null;
   const filePath = req.file?.path;
+  const originalFilename = req.file ? req.file.originalname : 'Document.txt';
 
   try {
-    if (!req.file) {
-      return res.status(400).json({ error: 'No PDF file uploaded.' });
+    if (!req.file && !req.body.text) {
+      return res.status(400).json({ error: 'No document file or text provided.' });
     }
 
     // Extract configuration from the form data
@@ -26,39 +28,52 @@ const generateQuestions = async (req, res) => {
       customSuggestion: req.body.customSuggestion || ''
     };
 
-    // 1 & 2. Extract and chunk text from the uploaded PDF
+    // 1 & 2. Extract and chunk text
     let chunks = [];
-    let extractedText = '';
+    let extractedText = req.body.text || '';
     
-    // Prioritize Gemini OCR for math, derivation, and algorithm PDF sources to preserve mathematical symbols (e.g. √3) and structured code.
-    const isMathOrTechnical = ['maths', 'derivations', 'algorithms'].includes(config.questionType);
-    
-    if (isMathOrTechnical) {
-      try {
-        console.log('Technical question type focus selected. Attempting high-fidelity Gemini OCR first...');
-        extractedText = await extractTextFromImagePdf(filePath);
-      } catch (ocrError) {
-        console.warn('Gemini OCR failed for technical PDF. Falling back to pdf-parse...', ocrError.message);
-      }
-    }
-    
-    if (!extractedText) {
-      try {
-        console.log('Attempting text extraction using pdf-parse...');
-        const parsed = await extractTextFromPdf(filePath);
-        extractedText = parsed.text || '';
-      } catch (parseError) {
-        console.warn('pdf-parse failed to read PDF structure.', parseError.message);
-      }
-    }
-    
-    // If not a technical type (so we ran pdf-parse first) and it yielded no text, or if we still have no text
-    if (!extractedText || !extractedText.trim()) {
-      try {
-        console.log('No text extracted or only whitespace. Attempting Gemini OCR fallback...');
-        extractedText = await extractTextFromImagePdf(filePath);
-      } catch (ocrError) {
-        console.error('Gemini OCR fallback failed:', ocrError.message);
+    if (!extractedText && req.file) {
+      const isDocx = originalFilename.toLowerCase().endsWith('.docx') || req.file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+      
+      if (isDocx) {
+        try {
+          console.log('Attempting text extraction from DOCX...');
+          const parsed = await extractTextFromDocx(filePath);
+          extractedText = parsed.text || '';
+        } catch (docxError) {
+          console.error('DOCX extraction failed:', docxError.message);
+        }
+      } else {
+        // Prioritize Gemini OCR for math, derivation, and algorithm PDF sources to preserve mathematical symbols (e.g. √3) and structured code.
+        const isMathOrTechnical = ['maths', 'derivations', 'algorithms'].includes(config.questionType);
+        
+        if (isMathOrTechnical) {
+          try {
+            console.log('Technical question type focus selected. Attempting high-fidelity Gemini OCR first...');
+            extractedText = await extractTextFromImagePdf(filePath);
+          } catch (ocrError) {
+            console.warn('Gemini OCR failed for technical PDF. Falling back to pdf-parse...', ocrError.message);
+          }
+        }
+        
+        if (!extractedText) {
+          try {
+            console.log('Attempting text extraction using pdf-parse...');
+            const parsed = await extractTextFromPdf(filePath);
+            extractedText = parsed.text || '';
+          } catch (parseError) {
+            console.warn('pdf-parse failed to read PDF structure.', parseError.message);
+          }
+        }
+        
+        if (!extractedText || !extractedText.trim()) {
+          try {
+            console.log('No text extracted or only whitespace. Attempting Gemini OCR fallback...');
+            extractedText = await extractTextFromImagePdf(filePath);
+          } catch (ocrError) {
+            console.error('Gemini OCR fallback failed:', ocrError.message);
+          }
+        }
       }
     }
     
@@ -66,14 +81,20 @@ const generateQuestions = async (req, res) => {
       const { chunkText } = require('../services/pdfService');
       chunks = chunkText(extractedText);
     } else {
-      throw new Error('The uploaded PDF appears to be empty, corrupted, or has no readable text. Please upload a valid study material PDF.');
+      throw new Error('The provided content appears to be empty, corrupted, or has no readable text. Please upload a valid study material document or paste valid text.');
     }
 
-    // Validate if the document contains sufficient content (reject short/single-topic PDFs)
+    // Validate if the document contains sufficient content
     const totalCharCount = chunks.reduce((acc, chunk) => acc + (chunk.content ? chunk.content.length : 0), 0);
-    if (totalCharCount < 2000) { // ~300-350 words minimum
+    
+    let requiredCharCount = 2000;
+    if (config.thirteenMark > 0 || config.sixteenMark > 0) {
+      requiredCharCount = 3500;
+    }
+    
+    if (totalCharCount < requiredCharCount) {
       return res.status(400).json({
-        error: 'The uploaded document contains too little content (less than ~300 words). Please upload a comprehensive semester unit, chapter, or study material PDF with sufficient text to generate a full question bank.'
+        error: `The provided content contains too little text (less than ~${Math.round(requiredCharCount/6)} words). Generating long questions (13 or 16 marks) requires more content. Please provide a more comprehensive text or PDF.`
       });
     }
 
@@ -129,7 +150,7 @@ const generateQuestions = async (req, res) => {
           try {
             console.log('Generating 13/16 mark questions using Groq fallback...');
             const groqService = require('../services/groqService');
-            const groqQuestionsString = await groqService.generateQuestionsFromContext(topChunks, {
+            const groqQuestionsString = await groqService.generateQuestionsFromContext(topChunks.slice(0, 3), {
               ...longQuestionConfig,
               twoMark: 0,
               thirteenMark: config.thirteenMark,
@@ -230,11 +251,13 @@ const generateQuestions = async (req, res) => {
     const historyModel = require('../models/historyModel');
     const statsModel = require('../models/statsModel');
     
-    statsModel.incrementPdfUploads();
-    statsModel.incrementGenerations();
+    const elapsedTimeMs = Date.now() - startTime;
+    if (req.file) {
+      statsModel.incrementPdfUploads();
+    }
+    statsModel.incrementGenerations(elapsedTimeMs);
     
     const bankId = crypto.randomUUID();
-    const originalFilename = req.file ? req.file.originalname : 'Document.pdf';
     historyModel.saveQuestionBank(bankId, originalFilename, config, questions);
 
     res.json({ success: true, id: bankId, questions });

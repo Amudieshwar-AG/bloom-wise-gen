@@ -1,3 +1,5 @@
 node_modules/
 .env
 src/uploads/
+database.sqlite
+chroma_error.log

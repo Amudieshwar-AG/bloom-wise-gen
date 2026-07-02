@@ -205,7 +205,7 @@ const generateEmbeddings = async (texts) => {
         console.warn('All Gemini keys failed to generate embeddings. Falling back to mock embeddings (first-N chunk retrieval)...');
         data = {
           embeddings: batch.map(() => ({
-            values: Array(768).fill(0.1)
+            values: Array(3072).fill(0.1)
           }))
         };
       }

@@ -77,8 +77,33 @@ const extractTextFromPdf = async (filePath) => {
   }
 };
 
+const extractTextFromDocx = async (filePath) => {
+  try {
+    const mammoth = require('mammoth');
+    const result = await mammoth.extractRawText({ path: filePath });
+    
+    // Step 3: Clean Text
+    const cleanedText = cleanText(result.value);
+
+    // Step 4: Semantic Chunking
+    const chunks = chunkText(cleanedText);
+
+    return {
+      text: cleanedText,
+      chunks: chunks,
+      metadata: {
+        messages: result.messages
+      }
+    };
+  } catch (error) {
+    console.error('Error extracting text from DOCX:', error);
+    throw new Error('Failed to parse DOCX file.');
+  }
+};
+
 module.exports = {
   extractTextFromPdf,
+  extractTextFromDocx,
   cleanText,
   chunkText
 };

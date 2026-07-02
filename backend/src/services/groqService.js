@@ -31,7 +31,7 @@ const callGroq = async (prompt, apiKey) => {
       }
     ],
     temperature: 0.1,
-    max_completion_tokens: 3500, // Hard limit to ensure we don't breach 12k TPM free tier limit
+    max_completion_tokens: 2500, // Reduced to ensure we don't breach 12k TPM free tier limit
     response_format: { type: "json_object" }
   });
 
